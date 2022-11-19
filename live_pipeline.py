@@ -1,14 +1,13 @@
 import wave as wav
+import asyncio
 import pyaudio
 import numpy as np
 from whisper import load_model, transcribe
 
-CHUNK = 1024
 FRAMES_PER_BUFFER = 3200
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
-RECORD_SECONDS = 5
 p = pyaudio.PyAudio()
 
 # starts recording
@@ -21,18 +20,23 @@ stream = p.open(
 
 model = load_model('medium')
 
-def live_pipeline():
-    piskorski_counter = 0
+async def live_pipeline():
     while True:
-        # data = stream.read(FRAMES_PER_BUFFER)
-        # data = np.frombuffer(data, np.int16).flatten().astype(np.float32) / 32768.0
-        # for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-        data = stream.read(CHUNK)
+        data = stream.read(FRAMES_PER_BUFFER)
         data = np.frombuffer(data, np.int16).flatten().astype(np.float32) / 32768.0
-        transcript = transcribe(model, data)
-        print(transcript)
-        if transcript["text"] == "actually":
-            piskorski_counter += 1
-            print("PISKORSKI_COUNTER: ", piskorski_counter)
+        print(data.shape)
+        return data
 
-live_pipeline()
+async def live_transcribe():
+    while True:
+        transcript = transcribe(model, await live_pipeline())
+        print(transcript)
+        await asyncio.sleep(2)
+
+async def main():
+    await asyncio.gather(live_transcribe())
+
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+asyncio.run(main())
